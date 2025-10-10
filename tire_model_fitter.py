@@ -70,6 +70,9 @@ def crop_data(df, criteria):
     elif (crit_operator == '==') | (crit_operator == '='):
         df = df[df[col_name] == crit_value]
         return df
+    elif (crit_operator == '!='):
+        df = df[df[col_name] != crit_value]
+        return df
     elif crit_operator == '<':
         df = df[df[col_name] < crit_value]
         return df
@@ -99,16 +102,25 @@ def pacejka_basic_model(x, B, C, D, E):
     # x = corresponding slip angle
     # y = Fx or Fy (or possibly Mz)
     # from Tyre and Vehicle Dynamics - Pacejka
-    y = (D*np.sin(C*np.atan(B*x - E*(B*x - np.arctan(B*x)))))
+    y = (D*np.sin(C*np.arctan(B*x - E*(B*x - np.arctan(B*x)))))
     return y
 
-def pacejka4_fy(X, d1, d2, b, c, sv, sh):
+def pacejka_basic_extended(X, B, C, D, E):
+    # x = slip angle
+    # y = Fz
+    slip, fz = X
+    fz = -abs(fz)
+    z = (fz*D*np.sin(C*np.arctan(B*slip - E*(B*slip - np.arctan(B*slip)))))
+    return z
+
+def pacejka4(X, d1, d2, b, c, sv, sh):
     # from some guy named cibachrome on reddit
-    # he says he knows his stuff though, so it must be true
+    # don't worry
+    # he says he knows his stuff, so it must be true
     slip, fz = X
     fz = -abs(fz) # fz is always negative
     d = (d1 + d2/1000*fz)*fz # normalizing peak value
-    Fy = d*np.sin(c*np.atan(b*(slip - sh))) + sv
+    Fy = d*np.sin(c*np.arctan(b*(slip - sh))) + sv
     return Fy
 
 
@@ -179,29 +191,36 @@ def graph_model_3d(x, y, z, z_pred, xtext_label='x-axis', ytext_label='y-axis', 
 """
 EXAMPLE CODE - implementation
 """
-df = load_data("/Users/alyssamcpoyle/fsae/B2356run8.mat")
+df = load_data("./B2356run8.mat")
 df = crop_data(df, 'ET > 900')
 df = crop_data(df, 'ET < 1090')
 
 # need user to define this
+# FY MODEL
+# note: for Fx model, change slip to be = np.array(df['SR'])
 slip = np.array(df['SA'])
 fz = np.array(df['FZ'])
 X = (slip, fz)
 fy = np.array(df['FY'])
-popt, pcov = curve_fit(pacejka4_fy, X, fy)
+popt, pcov = curve_fit(pacejka4, X, fy)
 
 d1, d2, b, c, sv, sh = popt
 
 # statistical scores
-residuals = fy - pacejka4_fy(X, d1, d2, b, c, sv, sh)
+residuals = fy - pacejka4(X, d1, d2, b, c, sv, sh)
 ss_res = np.sum(residuals**2)
 ss_tot = np.sum((fy - np.mean(fy))**2)
 r_squared = 1 - (ss_res/ss_tot)
 
+print("Fy model")
 print("Model R^2: ", r_squared)
+print("d1: ", d1)
+print("d2: ", d2)
+print("b: ", b)
+print("c: ", c)
+print("sv: ", sv)
+print("sh: ", sh)
+print("-------------")
 
-predicted_z = pacejka4_fy(X, d1, d2, b, c, sv, sh)
-
-# graph_model_2d(slip, y, predicted_y, xtext_label="Slip Angle", ytext_label="Lateral Force")
-
-graph_model_3d(slip, fz, fy, predicted_z)
+# uncomment to see graph of fit results
+# graph_model_3d(slip, fz, fy, predicted_z)
