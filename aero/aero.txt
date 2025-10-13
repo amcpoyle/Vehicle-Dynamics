@@ -1,0 +1,2 @@
+This is a collection of .ipynb files utilizing NeuralFoil/Aerosandbox for 2d airfoil optimization
+and Vortex Lattice Method airfoil optimization.
